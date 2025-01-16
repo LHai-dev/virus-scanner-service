@@ -1,0 +1,38 @@
+services:
+  localstack:
+    image: localstack/localstack:latest
+    container_name: localstack
+    ports:
+      - "4566:4566"
+      - "4510-4559:4510-4559"
+    environment:
+      - SERVICES=s3
+      - DATA_DIR=/tmp/localstack/data
+      - DEFAULT_REGION=ap-southeast-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - LOCALSTACK_HOST=127.0.0.1
+    volumes:
+      - ./.localstack:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./localstack-script.sh:/etc/localstack/init/ready.d/script.sh
+    logging:
+      driver: none
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+
+    depends_on:
+      - localstack
+
+  scan:
+    hostname: scan
+    container_name: scan
+    image: clamav/clamav
+    ports:
+      - "3310:3310"
+    restart: always
