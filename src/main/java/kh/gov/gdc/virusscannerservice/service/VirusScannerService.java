@@ -15,7 +15,7 @@ public class VirusScannerService {
     private final kh.gov.gdc.virusscannerservice.config.ClamAvScanner clamAvScanner;
 
     @Value("${aws.s3.buckets.quarantine}")
-    private String quarantineBucket;
+    public String quarantineBucket;
 
     @Value("${aws.s3.buckets.clean}")
     private String cleanBucket;
