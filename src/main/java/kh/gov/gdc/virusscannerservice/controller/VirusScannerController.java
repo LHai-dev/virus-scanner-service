@@ -1,5 +1,6 @@
 package kh.gov.gdc.virusscannerservice.controller;
 
+import kh.gov.gdc.virusscannerservice.dto.ScanLog;
 import kh.gov.gdc.virusscannerservice.dto.ScanResponse;
 import kh.gov.gdc.virusscannerservice.service.S3Service;
 import kh.gov.gdc.virusscannerservice.service.VirusScannerService;
@@ -25,19 +26,8 @@ public class VirusScannerController {
     private final VirusScannerService scannerService;
     private final S3Service s3Service;
 
-    @GetMapping
-    public String showScannerPage(Model model, @RequestParam(required = false) String bucket) {
-        if (bucket != null) {
-            List<String> files = s3Service.listFiles(bucket);
-            model.addAttribute("files", files);
-            model.addAttribute("currentBucket", bucket);
-        }
-        return "scanner";
-    }
-
     @PostMapping("/upload")
-    public String uploadFile(@RequestParam("file") MultipartFile file,
-                             RedirectAttributes redirectAttributes) {
+    public String uploadFile(@RequestParam("file") MultipartFile file, RedirectAttributes redirectAttributes) {
         try {
             String key = file.getOriginalFilename();
             // Upload file
@@ -47,20 +37,18 @@ public class VirusScannerController {
             ScanResponse scanResult = scannerService.scanFile(key);
 
             if (scanResult.isSuccess()) {
-                redirectAttributes.addFlashAttribute("message",
-                        "File uploaded and scanned successfully: " + key);
+                redirectAttributes.addFlashAttribute("message", "File uploaded and scanned successfully: " + key);
             } else {
-                redirectAttributes.addFlashAttribute("error",
-                        "File upload succeeded but scan failed: " + scanResult.getMessage());
+                redirectAttributes.addFlashAttribute("error", "File upload succeeded but scan failed: " + scanResult.getMessage());
             }
             redirectAttributes.addFlashAttribute("latestScanResult", scanResult);
 
         } catch (Exception e) {
-            redirectAttributes.addFlashAttribute("error",
-                    "Upload/scan failed: " + e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "Upload/scan failed: " + e.getMessage());
         }
         return "redirect:/scanner";
     }
+
     @GetMapping("/download/{key}")
     public ResponseEntity<InputStreamResource> downloadFile(@PathVariable String key) {
         try {
@@ -70,14 +58,13 @@ public class VirusScannerController {
             headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
             headers.setContentDispositionFormData("attachment", key);
 
-            return ResponseEntity.ok()
-                    .headers(headers)
-                    .body(new InputStreamResource(s3Object.getInputStream()));
+            return ResponseEntity.ok().headers(headers).body(new InputStreamResource(s3Object.getInputStream()));
         } catch (Exception e) {
             log.error("Error downloading file: {}", e.getMessage());
             return ResponseEntity.internalServerError().build();
         }
     }
+
     @PostMapping("/scan")
     public String scanFile(@RequestParam String key, Model model) {
         try {
@@ -86,6 +73,31 @@ public class VirusScannerController {
         } catch (Exception e) {
             model.addAttribute("error", "Scan failed: " + e.getMessage());
         }
+        return "scanner";
+    }
+
+    @GetMapping("/logs")
+    @ResponseBody
+    public List<ScanLog> getLogs() {
+        return scannerService.getScanLogs();
+    }
+
+    @GetMapping
+    public String showScannerPage(Model model, @RequestParam(required = false) String bucket) {
+        if (bucket != null) {
+            List<String> files = s3Service.listFiles(bucket);
+            model.addAttribute("files", files);
+            model.addAttribute("currentBucket", bucket);
+        }
+
+        // Add clean files list
+        List<String> cleanFiles = s3Service.listFiles(scannerService.cleanBucket);
+        model.addAttribute("cleanFiles", cleanFiles);
+
+        // Add scan logs
+        List<ScanLog> scanLogs = scannerService.getScanLogs();
+        model.addAttribute("scanLogs", scanLogs);
+
         return "scanner";
     }
 

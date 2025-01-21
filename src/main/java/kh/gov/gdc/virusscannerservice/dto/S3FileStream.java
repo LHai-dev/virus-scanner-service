@@ -1,4 +1,4 @@
-package kh.gov.gdc.virusscannerservice.service;
+package kh.gov.gdc.virusscannerservice.dto;
 
 import com.amazonaws.services.s3.model.S3ObjectInputStream;
 import lombok.AllArgsConstructor;

@@ -2,6 +2,7 @@ package kh.gov.gdc.virusscannerservice.service;
 
 import com.amazonaws.util.IOUtils;
 import kh.gov.gdc.virusscannerservice.FileNotFoundException;
+import kh.gov.gdc.virusscannerservice.dto.S3FileStream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,8 +25,21 @@ public class S3Service {
     private final AmazonS3 amazonS3;
     @Value("${aws.s3.buckets.quarantine}")
     private String quarantineBucket;
-    @Value("${aws.s3.buckets.clean}")
-    private String cleanBucket;
+
+    public ObjectMetadata getObjectMetadata(String bucket, String key) {
+        try {
+            // Get metadata of the object from S3
+            GetObjectMetadataRequest request = new GetObjectMetadataRequest(bucket, key);
+            ObjectMetadata metadata = amazonS3.getObjectMetadata(request);
+
+            return metadata;
+        } catch (AmazonS3Exception e) {
+            if (e.getStatusCode() == 404) {
+                throw new FileNotFoundException("File not found: " + key);
+            }
+            throw e;
+        }
+    }
 
     public S3FileStream getFileStream(String bucket, String key) {
         try {
