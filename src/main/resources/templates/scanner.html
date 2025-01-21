@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Virus Scanner Service</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .file-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .scan-result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .scan-result.clean {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+        }
+        .scan-result.infected {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+        }
+        .file-status {
+            font-size: 0.9em;
+            padding: 0.25em 0.6em;
+            border-radius: 3px;
+            margin-left: 10px;
+        }
+        .status-clean {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status-infected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+<div class="container mt-5">
+    <h1 class="mb-4">Virus Scanner Service</h1>
+
+    <!-- Alert Messages -->
+    <div th:if="${message}" class="alert alert-success" th:text="${message}"></div>
+    <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
+    <!-- File Upload Form -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Upload File</h5>
+        </div>
+        <div class="card-body">
+            <form th:action="@{/scanner/upload}" method="post" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <input type="file" class="form-control" name="file" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Upload & Scan</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Clean Files List -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Clean Files</h5>
+        </div>
+        <div class="card-body">
+            <div class="file-list">
+                <div class="list-group">
+                    <div th:each="file : ${cleanFiles}" class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span th:text="${file}"></span>
+                            <a th:href="@{/scanner/download/{key}(key=${file})}"
+                               class="btn btn-sm btn-success">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-download" viewBox="0 0 16 16">
+                                    <path d="M8 0a.5.5 0 0 1 .5.5v11.793l3.146-3.147a.5.5 0 0 1 .708.708l-4 4a.5.5 0 0 1-.708 0l-4-4a.5.5 0 0 1 .708-.708L7.5 12.293V.5A.5.5 0 0 1 8 0z"/>
+                                </svg>
+                                Download
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quarantine Files List -->
+    <div class="card mb-4" th:if="${files}">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Quarantine Files</h5>
+        </div>
+        <div class="card-body">
+            <div class="file-list">
+                <div class="list-group">
+                    <div th:each="file : ${files}" class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span th:text="${file}"></span>
+                            <span th:if="${scanResults != null && scanResults[file] != null}"
+                                  class="file-status"
+                                  th:classappend="${!scanResults[file].malicious} ? 'status-clean' : 'status-infected'"
+                                  th:text="${!scanResults[file].malicious} ? 'Clean' : 'Infected'">
+                                </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Latest Scan Result -->
+    <div th:if="${latestScanResult}" class="scan-result"
+         th:classappend="${!latestScanResult.malicious} ? 'clean' : 'infected'">
+        <h5>Latest Scan Result</h5>
+        <p><strong>File:</strong> <span th:text="${latestScanResult.cleanFileKey}"></span></p>
+        <p><strong>Status:</strong>
+            <span th:text="${!latestScanResult.malicious} ? 'Clean' : 'Infected'"></span>
+        </p>
+        <p th:if="${latestScanResult.message}" th:text="${latestScanResult.message}"></p>
+        <div th:if="${latestScanResult.malicious && latestScanResult.virusNames != null && !latestScanResult.virusNames.empty}">
+            <p><strong>Detected Viruses:</strong></p>
+            <ul>
+                <li th:each="virus : ${latestScanResult.virusNames}" th:text="${virus}"></li>
+            </ul>
+        </div>
+        <!-- Download button for clean files -->
+        <div th:if="${!latestScanResult.malicious && latestScanResult.cleanFileKey != null}" class="mt-3">
+            <a th:href="@{/scanner/download/{key}(key=${latestScanResult.cleanFileKey})}"
+               class="btn btn-success">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-download" viewBox="0 0 16 16">
+                    <path d="M8 0a.5.5 0 0 1 .5.5v11.793l3.146-3.147a.5.5 0 0 1 .708.708l-4 4a.5.5 0 0 1-.708 0l-4-4a.5.5 0 0 1 .708-.708L7.5 12.293V.5A.5.5 0 0 1 8 0z"/>
+                </svg>
+                Download Clean File
+            </a>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

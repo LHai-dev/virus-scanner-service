@@ -24,6 +24,8 @@ public class S3Service {
     private final AmazonS3 amazonS3;
     @Value("${aws.s3.buckets.quarantine}")
     private String quarantineBucket;
+    @Value("${aws.s3.buckets.clean}")
+    private String cleanBucket;
 
     public S3FileStream getFileStream(String bucket, String key) {
         try {

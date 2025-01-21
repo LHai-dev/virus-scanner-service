@@ -15,7 +15,7 @@ services:
     volumes:
       - ./.localstack:/var/lib/localstack
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./localstack-script.sh:/etc/localstack/init/ready.d/script.sh
+      - ./localstack-script.sh:/etc/localstack/init/ready.d/localstack-script.sh
     logging:
       driver: none
 

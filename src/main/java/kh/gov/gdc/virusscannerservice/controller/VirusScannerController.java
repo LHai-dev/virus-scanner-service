@@ -1,57 +1,97 @@
 package kh.gov.gdc.virusscannerservice.controller;
 
-import kh.gov.gdc.virusscannerservice.dto.ScanRequest;
 import kh.gov.gdc.virusscannerservice.dto.ScanResponse;
 import kh.gov.gdc.virusscannerservice.service.S3Service;
 import kh.gov.gdc.virusscannerservice.service.VirusScannerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-import java.util.Collections;
 import java.util.List;
 
-@RestController
-@RequestMapping("/api/v1/scan")
+@Controller
+@RequestMapping("/scanner")
 @RequiredArgsConstructor
 @Slf4j
 public class VirusScannerController {
     private final VirusScannerService scannerService;
     private final S3Service s3Service;
 
-    @PostMapping
-    public ResponseEntity<ScanResponse> scanFile(@RequestBody ScanRequest request) {
-        try {
-            return ResponseEntity.ok(scannerService.scanFile(request.getKey()));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(new ScanResponse(false, null, "Invalid key format: " + e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(new ScanResponse(false, null, "Error processing file: " + e.getMessage()));
+    @GetMapping
+    public String showScannerPage(Model model, @RequestParam(required = false) String bucket) {
+        if (bucket != null) {
+            List<String> files = s3Service.listFiles(bucket);
+            model.addAttribute("files", files);
+            model.addAttribute("currentBucket", bucket);
         }
+        return "scanner";
     }
 
     @PostMapping("/upload")
-    public ResponseEntity<String> uploadFileToS3(@RequestParam("file") MultipartFile file) {
+    public String uploadFile(@RequestParam("file") MultipartFile file,
+                             RedirectAttributes redirectAttributes) {
         try {
             String key = file.getOriginalFilename();
+            // Upload file
             s3Service.uploadFile(file, key);
-            return ResponseEntity.ok("File uploaded successfully to S3 with key: " + key);
+
+            // Scan the uploaded file
+            ScanResponse scanResult = scannerService.scanFile(key);
+
+            if (scanResult.isSuccess()) {
+                redirectAttributes.addFlashAttribute("message",
+                        "File uploaded and scanned successfully: " + key);
+            } else {
+                redirectAttributes.addFlashAttribute("error",
+                        "File upload succeeded but scan failed: " + scanResult.getMessage());
+            }
+            redirectAttributes.addFlashAttribute("latestScanResult", scanResult);
+
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error uploading file: " + e.getMessage());
+            redirectAttributes.addFlashAttribute("error",
+                    "Upload/scan failed: " + e.getMessage());
+        }
+        return "redirect:/scanner";
+    }
+    @GetMapping("/download/{key}")
+    public ResponseEntity<InputStreamResource> downloadFile(@PathVariable String key) {
+        try {
+            var s3Object = s3Service.getFileStream(scannerService.cleanBucket, key);
+
+            org.springframework.http.HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+            headers.setContentDispositionFormData("attachment", key);
+
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(new InputStreamResource(s3Object.getInputStream()));
+        } catch (Exception e) {
+            log.error("Error downloading file: {}", e.getMessage());
+            return ResponseEntity.internalServerError().build();
         }
     }
-
-
-    @GetMapping("/files")
-    public ResponseEntity<List<String>> listFiles(@RequestParam String bucket) {
+    @PostMapping("/scan")
+    public String scanFile(@RequestParam String key, Model model) {
         try {
-            List<String> fileKeys = s3Service.listFiles(bucket);
-            return ResponseEntity.ok(fileKeys);
+            ScanResponse response = scannerService.scanFile(key);
+            model.addAttribute("scanResult", response);
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(Collections.singletonList("Error listing files: " + e.getMessage()));
+            model.addAttribute("error", "Scan failed: " + e.getMessage());
         }
+        return "scanner";
+    }
+
+    @ResponseBody
+    @GetMapping("/api/files")
+    public List<String> getFiles(@RequestParam String bucket) {
+        return s3Service.listFiles(bucket);
     }
 }
